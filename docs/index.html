@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0d1117">
+  <title>Git Repo Visualiser</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌳</text></svg>">
+</head>
+<body>
+  <header id="app-header">
+    <div class="header-left">
+      <h1>🌳 Git Repo Visualiser</h1>
+    </div>
+    <div class="header-right">
+      <span id="rate-limit" class="rate-info" title="GitHub API rate limit"></span>
+    </div>
+  </header>
+
+  <section id="input-section">
+    <form id="repo-form">
+      <div class="input-row">
+        <input
+          type="url"
+          id="repo-url"
+          placeholder="github.com/owner/repo"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          enterkeyhint="go"
+        >
+        <button type="submit" id="visualize-btn">Visualise</button>
+      </div>
+      <div class="options-row">
+        <label>
+          Max:
+          <select id="max-commits">
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="500" selected>500</option>
+            <option value="1000">1000</option>
+          </select>
+        </label>
+        <button type="button" id="token-toggle" class="link-btn">+ Token</button>
+        <div id="token-section" class="hidden">
+          <input
+            type="password"
+            id="github-token"
+            placeholder="ghp_... (optional, raises limit)"
+            autocomplete="off"
+          >
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <div id="loading" class="hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">Loading repository...</p>
+    <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+  </div>
+
+  <div id="error-message" class="hidden"></div>
+
+  <main id="main-content" class="hidden">
+    <!-- Desktop toolbar -->
+    <div id="toolbar">
+      <div class="toolbar-left">
+        <span id="repo-info"></span>
+      </div>
+      <div class="toolbar-right">
+        <!-- Desktop controls -->
+        <div class="toolbar-controls desktop-only">
+          <input type="text" id="search-input" placeholder="Search commits... (/)">
+          <select id="author-filter"><option value="">All Authors</option></select>
+          <select id="branch-filter"><option value="">All Branches</option></select>
+          <button type="button" id="clear-filters" class="toolbar-btn" title="Clear filters (c)">✕ Clear</button>
+          <button type="button" id="legend-toggle" class="toolbar-btn" title="Toggle legend (l)">👥 Legend</button>
+        </div>
+        <!-- Mobile: single filter button -->
+        <button type="button" id="mobile-filter-btn" class="toolbar-btn mobile-only">🔍 Filters</button>
+      </div>
+    </div>
+
+    <div id="main-area">
+      <div id="graph-container" tabindex="0">
+        <svg id="graph-svg"></svg>
+      </div>
+      <aside id="side-panel">
+        <div id="detail-panel">
+          <div class="panel-placeholder">Select a commit to view details</div>
+        </div>
+        <div id="legend-panel" class="hidden"></div>
+      </aside>
+    </div>
+
+    <div id="status-bar">
+      <span id="status-text"></span>
+      <span id="keyboard-hints">↑↓ navigate · Enter select · / search · l legend · ? help</span>
+    </div>
+
+    <!-- Mobile bottom action bar -->
+    <nav id="mobile-action-bar">
+      <div class="action-bar-inner">
+        <button type="button" class="action-btn" data-action="detail">
+          <span class="action-icon">📋</span>
+          <span>Detail</span>
+        </button>
+        <button type="button" class="action-btn" data-action="search">
+          <span class="action-icon">🔍</span>
+          <span>Search</span>
+        </button>
+        <button type="button" class="action-btn" data-action="filter">
+          <span class="action-icon">⚙️</span>
+          <span>Filter</span>
+        </button>
+        <button type="button" class="action-btn" data-action="legend">
+          <span class="action-icon">👥</span>
+          <span>Legend</span>
+        </button>
+        <button type="button" class="action-btn" data-action="help">
+          <span class="action-icon">❓</span>
+          <span>Help</span>
+        </button>
+      </div>
+    </nav>
+  </main>
+
+  <!-- Bottom sheet backdrop (shared) -->
+  <div id="sheet-backdrop" class="bottom-sheet-backdrop"></div>
+
+  <!-- Bottom sheet: Commit detail (mobile) -->
+  <div id="detail-sheet" class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Commit Details</h3>
+      <button class="sheet-close" data-sheet="detail-sheet">&times;</button>
+    </div>
+    <div class="sheet-body" id="detail-sheet-body">
+      <div class="panel-placeholder">Tap a commit to view details</div>
+    </div>
+  </div>
+
+  <!-- Bottom sheet: Search (mobile) -->
+  <div id="search-sheet" class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Search Commits</h3>
+      <button class="sheet-close" data-sheet="search-sheet">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <div class="mobile-filter-group">
+        <label for="mobile-search">Search messages, SHAs, authors</label>
+        <input type="search" id="mobile-search" placeholder="Type to search..." enterkeyhint="search" autocomplete="off">
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom sheet: Filter (mobile) -->
+  <div id="filter-sheet" class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Filters</h3>
+      <button class="sheet-close" data-sheet="filter-sheet">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <div class="mobile-filter-group">
+        <label for="mobile-author-filter">Author</label>
+        <select id="mobile-author-filter"><option value="">All Authors</option></select>
+      </div>
+      <div class="mobile-filter-group">
+        <label for="mobile-branch-filter">Branch</label>
+        <select id="mobile-branch-filter"><option value="">All Branches</option></select>
+      </div>
+      <button type="button" id="mobile-clear-filters" class="mobile-clear-btn">Clear All Filters</button>
+    </div>
+  </div>
+
+  <!-- Bottom sheet: Legend (mobile) -->
+  <div id="legend-sheet" class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <h3>Contributors</h3>
+      <button class="sheet-close" data-sheet="legend-sheet">&times;</button>
+    </div>
+    <div class="sheet-body" id="legend-sheet-body"></div>
+  </div>
+
+  <!-- Help modal (works on both desktop and mobile) -->
+  <div id="help-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>How to Use</h2>
+      <div class="keyboard-shortcuts">
+        <h3 style="font-size:13px; color:var(--text-secondary); margin-bottom:8px;">Keyboard Shortcuts</h3>
+        <table class="shortcuts-table">
+          <tr><td><kbd>↑</kbd> / <kbd>k</kbd></td><td>Move cursor up</td></tr>
+          <tr><td><kbd>↓</kbd> / <kbd>j</kbd></td><td>Move cursor down</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Select commit</td></tr>
+          <tr><td><kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Page up / down</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last commit</td></tr>
+          <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
+          <tr><td><kbd>l</kbd></td><td>Toggle legend</td></tr>
+          <tr><td><kbd>c</kbd></td><td>Clear filters</td></tr>
+          <tr><td><kbd>Escape</kbd></td><td>Dismiss</td></tr>
+          <tr><td><kbd>?</kbd></td><td>Toggle help</td></tr>
+        </table>
+      </div>
+      <div class="touch-hints" style="display:none;">
+        <h3 style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">Touch Gestures</h3>
+        <table class="shortcuts-table">
+          <tr><td style="font-size:18px">👆</td><td>Tap a commit to see details</td></tr>
+          <tr><td style="font-size:18px">↕️</td><td>Scroll to browse history</td></tr>
+          <tr><td style="font-size:18px">↔️</td><td>Scroll sideways for branches</td></tr>
+          <tr><td style="font-size:18px">⬇️</td><td>Swipe down on sheet to close</td></tr>
+        </table>
+        <p style="margin-top:16px; font-size:12px; color:var(--text-secondary);">Use the bottom bar to access Search, Filters, Legend, and Help.</p>
+      </div>
+      <button type="button" id="help-close">Close</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
