@@ -2,9 +2,7 @@
 
 **See the shape of any GitHub repo in seconds.** Paste a link, get an interactive branching tree with contributor colors — right in your browser or terminal.
 
-### [**→ Try it now**](https://nodesaint.github.io/git-repo-visualiser/)
-
-> `https://nodesaint.github.io/git-repo-visualiser/`
+### [**→ Try it live**](https://nodesaint.github.io/git-repo-visualiser/)  ·  [**GitHub**](https://github.com/NodeSaint/git-repo-visualiser)
 
 ---
 
