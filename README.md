@@ -4,7 +4,7 @@
 
 ### [**→ Try it now**](https://nodesaint.github.io/git-repo-visualiser/)
 
-> `https://nodesaint.github.io/git-repo-visualiser/?repo=facebook/react`
+> `https://nodesaint.github.io/git-repo-visualiser/`
 
 ---
 
